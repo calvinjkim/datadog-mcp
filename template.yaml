@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Datadog MCP Server - Read-only Metrics & Logs for Claude
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: nodejs20.x
+
+Parameters:
+  DatadogApiKey:
+    Type: String
+    NoEcho: true
+    Description: Datadog API Key
+  DatadogAppKey:
+    Type: String
+    NoEcho: true
+    Description: Datadog Application Key
+  DatadogSite:
+    Type: String
+    Default: datadoghq.com
+    Description: Datadog site (e.g. datadoghq.com, datadoghq.eu)
+
+Resources:
+  McpApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Auth:
+        ApiKeyRequired: true
+
+  McpFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/index.ts
+    Properties:
+      Handler: index.handler
+      CodeUri: .
+      Environment:
+        Variables:
+          DD_API_KEY: !Ref DatadogApiKey
+          DD_APP_KEY: !Ref DatadogAppKey
+          DD_SITE: !Ref DatadogSite
+      Events:
+        McpPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref McpApi
+            Path: /mcp
+            Method: POST
+        McpGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref McpApi
+            Path: /mcp
+            Method: GET
+        McpDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref McpApi
+            Path: /mcp
+            Method: DELETE
+
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: McpApiprodStage
+    Properties:
+      Name: datadog-mcp-team-key
+      Enabled: true
+      StageKeys:
+        - RestApiId: !Ref McpApi
+          StageName: prod
+
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: McpApiprodStage
+    Properties:
+      UsagePlanName: datadog-mcp-plan
+      Throttle:
+        BurstLimit: 50
+        RateLimit: 20
+      Quota:
+        Limit: 10000
+        Period: DAY
+      ApiStages:
+        - ApiId: !Ref McpApi
+          Stage: prod
+
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
+
+Outputs:
+  McpEndpoint:
+    Description: MCP Server endpoint URL
+    Value: !Sub 'https://${McpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/mcp'
+  ApiKeyId:
+    Description: API Key ID (run "aws apigateway get-api-key --api-key <id> --include-value" to get the key value)
+    Value: !Ref ApiKey

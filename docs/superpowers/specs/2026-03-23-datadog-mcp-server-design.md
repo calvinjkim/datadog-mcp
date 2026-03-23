@@ -36,7 +36,7 @@ AWS Lambda + API Gateway에 배포하고, 팀원 누구나 공용 API Key로 접
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
 | Runtime | Node.js 20 | MCP SDK TypeScript 네이티브 지원 |
-| MCP SDK | `@modelcontextprotocol/server`, `@modelcontextprotocol/node` | 공식 Streamable HTTP transport |
+| MCP SDK | `@modelcontextprotocol/sdk` | 공식 SDK. `McpServer`, `StreamableHTTPServerTransport` 포함 |
 | HTTP Client | `axios` | Datadog API 호출 |
 | IaC | AWS SAM | Lambda + API Gateway 원클릭 배포 |
 | Auth | API Gateway API Key | 팀 공용 키. 별도 계정 불필요 |
@@ -81,6 +81,7 @@ Datadog 메트릭 시계열 데이터를 조회한다.
 - **Datadog API**: `GET /api/v1/metrics`
 - **Input Schema**:
   - `query` (string, required): 검색 패턴. e.g. `system.cpu.*`
+  - `from` (string, required): 해당 시점 이후 활성 메트릭만 반환. epoch seconds 또는 상대 시간 (e.g. `1h`, `1d`)
 - **Output**: 매칭되는 메트릭 이름 목록
 
 ### 3. get_metric_metadata
@@ -101,8 +102,8 @@ Datadog 메트릭 시계열 데이터를 조회한다.
   - `query` (string, required): Datadog 로그 쿼리. e.g. `status:error service:api`
   - `from` (string, required): 시작 시간
   - `to` (string, optional, default: "now"): 종료 시간
-  - `limit` (number, optional, default: 50, max: 1000): 반환할 로그 수
-  - `sort` (string, optional, default: "timestamp desc"): 정렬 순서
+  - `limit` (number, optional, default: 50, max: 200): 반환할 로그 수
+  - `sort` (string, optional, default: "-timestamp"): 정렬 순서. `"timestamp"` (오름차순) 또는 `"-timestamp"` (내림차순)
 - **Output**: 로그 이벤트 목록 (timestamp, message, attributes)
 
 ### 5. list_log_indexes
@@ -119,8 +120,8 @@ Lambda는 stateless MCP 서버로 동작한다. 핵심 설계:
 
 ```typescript
 // src/index.ts 의사 코드
-import { McpServer } from '@modelcontextprotocol/server';
-import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 // MCP 서버 인스턴스 (Lambda 콜드스타트 시 1회 생성)
 const server = new McpServer({
@@ -134,15 +135,17 @@ registerLogsTools(server);
 
 // Lambda 핸들러
 export const handler = async (event, context) => {
-  // API Gateway 이벤트 → Node.js HTTP 요청으로 변환
-  const transport = new NodeStreamableHTTPServerTransport({
+  // API Gateway 이벤트 → Node.js HTTP 요청/응답으로 변환
+  const { req, res } = convertApiGatewayToNodeHttp(event);
+
+  const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless - 세션 없음
   });
   await server.connect(transport);
 
-  // MCP 프로토콜 처리 후 응답 반환
-  const response = await transport.handleRequest(req, res);
-  return apiGatewayResponse(response);
+  // MCP 프로토콜 처리 (req.body를 반드시 전달)
+  await transport.handleRequest(req, res, req.body);
+  return convertNodeHttpToApiGatewayResponse(res);
 };
 ```
 
@@ -232,6 +235,7 @@ Resources:
 
   ApiKey:
     Type: AWS::ApiGateway::ApiKey
+    DependsOn: McpApiprodStage
     Properties:
       Name: datadog-mcp-team-key
       Enabled: true
@@ -322,7 +326,7 @@ Outputs:
 
 ## Security Considerations
 
-- **Datadog 키**: Lambda 환경변수에 저장. 콘솔에서 암호화됨
+- **Datadog 키**: Lambda 환경변수에 저장. `lambda:GetFunctionConfiguration` 권한이 있으면 평문 조회 가능하므로 IAM 접근 제어 필수. 보안 강화가 필요하면 v2에서 SSM Parameter Store SecureString으로 전환 권장
 - **API Key**: API Gateway 레벨 인증. 키 없이는 Lambda에 도달 불가
 - **읽기 전용**: 쓰기/수정/삭제 API는 의도적으로 구현하지 않음
 - **Rate Limiting**: Usage Plan으로 남용 방지

@@ -33,6 +33,7 @@ function apiGatewayToReqRes(event: APIGatewayProxyEvent): {
   req: IncomingMessage;
   res: ServerResponse;
   getResponse: () => APIGatewayProxyResult;
+  cleanup: () => void;
 } {
   const body = event.isBase64Encoded
     ? Buffer.from(event.body || '', 'base64').toString()
@@ -115,12 +116,17 @@ function apiGatewayToReqRes(event: APIGatewayProxyEvent): {
     body: responseBody,
   });
 
-  return { req, res, getResponse };
+  const cleanup = () => {
+    socket.destroy();
+  };
+
+  return { req, res, getResponse, cleanup };
 }
 
 export const handler = async (
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> => {
+  let cleanup: (() => void) | undefined;
   try {
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({
@@ -130,7 +136,9 @@ export const handler = async (
 
     await server.connect(transport);
 
-    const { req, res, getResponse } = apiGatewayToReqRes(event);
+    const adapter = apiGatewayToReqRes(event);
+    cleanup = adapter.cleanup;
+    const { req, res, getResponse } = adapter;
 
     if ((req as any).parseError) {
       return {
@@ -162,5 +170,7 @@ export const handler = async (
         id: null,
       }),
     };
+  } finally {
+    cleanup?.();
   }
 };

@@ -28,6 +28,16 @@ describe('DatadogClient', () => {
     });
   });
 
+  it('throws for disallowed DD_SITE values', () => {
+    expect(() => new DatadogClient('key', 'app', 'evil.com')).toThrow('Invalid DD_SITE');
+  });
+
+  it('accepts all official Datadog sites', () => {
+    for (const site of ['datadoghq.com', 'us3.datadoghq.com', 'us5.datadoghq.com', 'datadoghq.eu', 'ap1.datadoghq.com', 'ddog-gov.com']) {
+      expect(() => new DatadogClient('key', 'app', site)).not.toThrow();
+    }
+  });
+
   describe('queryMetrics', () => {
     it('calls GET /api/v1/query with correct params', async () => {
       const mockData = { series: [{ pointlist: [[1000, 42]] }] };
@@ -210,18 +220,13 @@ describe('DatadogClient', () => {
       const result = await client.searchSpans('service:api', 1000, 2000, 50, '-timestamp');
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/v2/spans/events/search', {
-        data: {
-          type: 'search_request',
-          attributes: {
-            filter: {
-              query: 'service:api',
-              from: new Date(1000 * 1000).toISOString(),
-              to: new Date(2000 * 1000).toISOString(),
-            },
-            sort: '-timestamp',
-            page: { limit: 50 },
-          },
+        filter: {
+          query: 'service:api',
+          from: new Date(1000 * 1000).toISOString(),
+          to: new Date(2000 * 1000).toISOString(),
         },
+        sort: '-timestamp',
+        page: { limit: 50 },
       });
       expect(result).toEqual(mockData);
     });

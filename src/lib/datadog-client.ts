@@ -1,9 +1,23 @@
 import axios, { AxiosInstance } from 'axios';
 
+const ALLOWED_DD_SITES = new Set([
+  'datadoghq.com',
+  'us3.datadoghq.com',
+  'us5.datadoghq.com',
+  'datadoghq.eu',
+  'ap1.datadoghq.com',
+  'ddog-gov.com',
+]);
+
 export class DatadogClient {
   private client: AxiosInstance;
 
   constructor(apiKey: string, appKey: string, site: string) {
+    if (!ALLOWED_DD_SITES.has(site)) {
+      throw new Error(
+        `Invalid DD_SITE "${site}". Allowed: ${[...ALLOWED_DD_SITES].join(', ')}`,
+      );
+    }
     this.client = axios.create({
       baseURL: `https://api.${site}`,
       headers: {
@@ -60,7 +74,7 @@ export class DatadogClient {
       params: {
         ...(params.groupStates && { group_states: params.groupStates }),
         ...(params.tags && { monitor_tags: params.tags }),
-        ...(params.pageSize && { page_size: params.pageSize }),
+        ...(params.pageSize !== undefined && { page_size: params.pageSize }),
         ...(params.page !== undefined && { page: params.page }),
       },
     });
@@ -119,18 +133,13 @@ export class DatadogClient {
     sort: string,
   ) {
     const { data } = await this.client.post('/api/v2/spans/events/search', {
-      data: {
-        type: 'search_request',
-        attributes: {
-          filter: {
-            query,
-            from: new Date(from * 1000).toISOString(),
-            to: new Date(to * 1000).toISOString(),
-          },
-          sort,
-          page: { limit },
-        },
+      filter: {
+        query,
+        from: new Date(from * 1000).toISOString(),
+        to: new Date(to * 1000).toISOString(),
       },
+      sort,
+      page: { limit },
     });
     return data;
   }

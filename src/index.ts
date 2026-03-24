@@ -10,9 +10,13 @@ import { registerMonitorsTools } from './tools/monitors';
 import { registerIncidentsTools } from './tools/incidents';
 import { registerApmTools } from './tools/apm';
 
+if (!process.env.DD_API_KEY || !process.env.DD_APP_KEY) {
+  throw new Error('DD_API_KEY and DD_APP_KEY environment variables are required');
+}
+
 const ddClient = new DatadogClient(
-  process.env.DD_API_KEY || '',
-  process.env.DD_APP_KEY || '',
+  process.env.DD_API_KEY,
+  process.env.DD_APP_KEY,
   process.env.DD_SITE || 'datadoghq.com',
 );
 

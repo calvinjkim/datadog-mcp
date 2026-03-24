@@ -30,7 +30,7 @@ export function registerIncidentsTools(server: McpServer, client: DatadogClient)
       title: 'Get Datadog Incident',
       description: 'Get detailed information about a specific Datadog incident by ID.',
       inputSchema: z.object({
-        incident_id: z.string().describe('The incident ID (UUID)'),
+        incident_id: z.string().min(1).describe('The incident ID (UUID)'),
       }),
     },
     async ({ incident_id }) => {

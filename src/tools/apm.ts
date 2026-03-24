@@ -29,8 +29,8 @@ export function registerApmTools(server: McpServer, client: DatadogClient): void
       description:
         'Search APM spans (traces) using Datadog query syntax, e.g. "service:api @http.status_code:500 env:production"',
       inputSchema: z.object({
-        query: z.string().describe('Span search query, e.g. "service:api @duration:>1s"'),
-        from: z.string().describe('Start time: epoch seconds or relative (e.g. "15m", "1h", "1d")'),
+        query: z.string().min(1).describe('Span search query, e.g. "service:api @duration:>1s"'),
+        from: z.string().min(1).describe('Start time: epoch seconds or relative (e.g. "15m", "1h", "1d")'),
         to: z.string().default('now').describe('End time. Default: "now"'),
         limit: z.number().min(1).max(1000).default(50).describe('Max spans to return (1-1000). Default: 50'),
         sort: z
@@ -58,9 +58,9 @@ export function registerApmTools(server: McpServer, client: DatadogClient): void
       description:
         'Get performance summary (latency, error rate, throughput) for a specific APM service in an environment.',
       inputSchema: z.object({
-        env: z.string().describe('Environment name, e.g. "production"'),
-        service: z.string().describe('Service name, e.g. "api-gateway"'),
-        from: z.string().describe('Start time: epoch seconds or relative (e.g. "1h", "6h", "1d")'),
+        env: z.string().min(1).describe('Environment name, e.g. "production"'),
+        service: z.string().min(1).describe('Service name, e.g. "api-gateway"'),
+        from: z.string().min(1).describe('Start time: epoch seconds or relative (e.g. "1h", "6h", "1d")'),
         to: z.string().default('now').describe('End time. Default: "now"'),
       }),
     },

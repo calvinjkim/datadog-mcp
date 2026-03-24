@@ -35,7 +35,7 @@ export function registerMonitorsTools(server: McpServer, client: DatadogClient):
       title: 'Get Datadog Monitor',
       description: 'Get detailed information about a specific Datadog monitor by ID.',
       inputSchema: z.object({
-        monitor_id: z.number().describe('The monitor ID'),
+        monitor_id: z.number().int().positive().describe('The monitor ID'),
         group_states: z
           .string()
           .optional()
@@ -59,7 +59,7 @@ export function registerMonitorsTools(server: McpServer, client: DatadogClient):
       description:
         'Search monitors using Datadog query syntax, e.g. "type:metric status:alert service:api"',
       inputSchema: z.object({
-        query: z.string().describe('Monitor search query, e.g. "type:metric status:alert"'),
+        query: z.string().min(1).describe('Monitor search query, e.g. "type:metric status:alert"'),
         per_page: z.number().min(1).max(100).default(30).describe('Results per page (1-100). Default: 30'),
         page: z.number().min(0).default(0).describe('Page number (0-indexed). Default: 0'),
       }),

@@ -6,6 +6,9 @@ import { Socket } from 'net';
 import { DatadogClient } from './lib/datadog-client';
 import { registerMetricsTools } from './tools/metrics';
 import { registerLogsTools } from './tools/logs';
+import { registerMonitorsTools } from './tools/monitors';
+import { registerIncidentsTools } from './tools/incidents';
+import { registerApmTools } from './tools/apm';
 
 const ddClient = new DatadogClient(
   process.env.DD_API_KEY || '',
@@ -20,6 +23,9 @@ function createServer(): McpServer {
   });
   registerMetricsTools(server, ddClient);
   registerLogsTools(server, ddClient);
+  registerMonitorsTools(server, ddClient);
+  registerIncidentsTools(server, ddClient);
+  registerApmTools(server, ddClient);
   return server;
 }
 

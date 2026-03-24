@@ -52,4 +52,98 @@ export class DatadogClient {
     const { data } = await this.client.get('/api/v1/logs/config/indexes');
     return data;
   }
+
+  // --- Monitors ---
+
+  async listMonitors(params: { groupStates?: string; tags?: string; pageSize?: number; page?: number } = {}) {
+    const { data } = await this.client.get('/api/v1/monitor', {
+      params: {
+        ...(params.groupStates && { group_states: params.groupStates }),
+        ...(params.tags && { monitor_tags: params.tags }),
+        ...(params.pageSize && { page_size: params.pageSize }),
+        ...(params.page !== undefined && { page: params.page }),
+      },
+    });
+    return data;
+  }
+
+  async getMonitor(monitorId: number, params: { groupStates?: string } = {}) {
+    const { data } = await this.client.get(`/api/v1/monitor/${monitorId}`, {
+      params: {
+        ...(params.groupStates && { group_states: params.groupStates }),
+      },
+    });
+    return data;
+  }
+
+  async searchMonitors(query: string, page?: number, perPage?: number) {
+    const { data } = await this.client.get('/api/v1/monitor/search', {
+      params: { query, ...(page !== undefined && { page }), ...(perPage && { per_page: perPage }) },
+    });
+    return data;
+  }
+
+  // --- Downtimes ---
+
+  async listDowntimes() {
+    const { data } = await this.client.get('/api/v2/downtime');
+    return data;
+  }
+
+  // --- Incidents ---
+
+  async listIncidents(pageSize: number = 25, pageOffset: number = 0) {
+    const { data } = await this.client.get('/api/v2/incidents', {
+      params: { 'page[size]': pageSize, 'page[offset]': pageOffset },
+    });
+    return data;
+  }
+
+  async getIncident(incidentId: string) {
+    const { data } = await this.client.get(`/api/v2/incidents/${encodeURIComponent(incidentId)}`);
+    return data;
+  }
+
+  // --- APM / Traces ---
+
+  async listServices() {
+    const { data } = await this.client.get('/api/v1/service_dependencies/mapping');
+    return data;
+  }
+
+  async searchSpans(
+    query: string,
+    from: number,
+    to: number,
+    limit: number,
+    sort: string,
+  ) {
+    const { data } = await this.client.post('/api/v2/spans/events/search', {
+      data: {
+        type: 'search_request',
+        attributes: {
+          filter: {
+            query,
+            from: new Date(from * 1000).toISOString(),
+            to: new Date(to * 1000).toISOString(),
+          },
+          sort,
+          page: { limit },
+        },
+      },
+    });
+    return data;
+  }
+
+  async getServiceSummary(
+    env: string,
+    service: string,
+    from: number,
+    to: number,
+  ) {
+    const { data } = await this.client.get('/api/v1/trace/stats/summary', {
+      params: { env, service, start: from, end: to },
+    });
+    return data;
+  }
 }
